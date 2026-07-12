@@ -86,7 +86,7 @@ export default function App() {
         <PaymentReturn sessionId={sessionId} />
       ) : view === "customer" ? <CustomerView /> : <AdminView />}
       <footer className="text-center text-xs text-[#5C5C52] py-8 px-6">
-        Tend — now backed by a real Supabase database. Data here is real and persists.
+        Slothaus — now backed by a real Supabase database. Data here is real and persists.
       </footer>
     </div>
   );
