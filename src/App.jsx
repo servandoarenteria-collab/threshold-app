@@ -44,7 +44,8 @@ async function sbRest(path, { method = "GET", body, token, prefer } = {}) {
     throw new Error(err?.message || `Request failed (${res.status})`);
   }
   if (res.status === 204) return null;
-  return res.json();
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 function useFonts() {
