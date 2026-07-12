@@ -96,7 +96,7 @@ function TopNav({ view, setView }) {
   return (
     <div className="border-b border-[#262B34] px-6 py-4 flex items-center justify-between sticky top-0 bg-[#14181F]/95 backdrop-blur z-10">
       <div className="flex items-baseline gap-2">
-        <span style={{ fontFamily: "'Fraunces', serif" }} className="text-xl font-semibold tracking-tight text-[#E9E6DD]">Tend</span>
+        <span style={{ fontFamily: "'Fraunces', serif" }} className="text-xl font-semibold tracking-tight text-[#E9E6DD]">Slothaus</span>
         <span className="text-[10px] uppercase tracking-[0.15em] text-[#C99A56] font-mono" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>live</span>
       </div>
       <div className="flex gap-1 bg-[#1D222B] rounded-full p-1">
