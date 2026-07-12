@@ -77,10 +77,14 @@ function slugify(s) {
 export default function App() {
   useFonts();
   const [view, setView] = useState("customer");
+  const sessionId = new URLSearchParams(window.location.search).get("session_id");
+
   return (
     <div style={{ fontFamily: "'Inter', sans-serif" }} className="min-h-screen bg-[#14181F] text-[#E9E6DD]">
       <TopNav view={view} setView={setView} />
-      {view === "customer" ? <CustomerView /> : <AdminView />}
+      {sessionId ? (
+        <PaymentReturn sessionId={sessionId} />
+      ) : view === "customer" ? <CustomerView /> : <AdminView />}
       <footer className="text-center text-xs text-[#5C5C52] py-8 px-6">
         Threshold — now backed by a real Supabase database. Data here is real and persists.
       </footer>
@@ -99,6 +103,54 @@ function TopNav({ view, setView }) {
         <button onClick={() => setView("customer")} className={`px-4 py-1.5 rounded-full text-sm transition ${view === "customer" ? "bg-[#C99A56] text-[#14181F] font-medium" : "text-[#9A9A8C] hover:text-[#E9E6DD]"}`}>Booking page</button>
         <button onClick={() => setView("admin")} className={`px-4 py-1.5 rounded-full text-sm transition ${view === "admin" ? "bg-[#C99A56] text-[#14181F] font-medium" : "text-[#9A9A8C] hover:text-[#E9E6DD]"}`}>Business dashboard</button>
       </div>
+    </div>
+  );
+}
+
+function PaymentReturn({ sessionId }) {
+  const [status, setStatus] = useState("checking"); // checking | done | error
+  const [meta, setMeta] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`/api/confirm-booking?session_id=${encodeURIComponent(sessionId)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not confirm payment");
+        setMeta(data.metadata);
+        setStatus("done");
+        // clean the URL so refreshing doesn't re-run this
+        window.history.replaceState({}, "", window.location.pathname);
+      } catch (e) {
+        setError(e.message);
+        setStatus("error");
+      }
+    })();
+  }, [sessionId]);
+
+  if (status === "checking") {
+    return (
+      <div className="max-w-lg mx-auto px-6 py-24 text-center flex flex-col items-center gap-3 text-[#8C8C7E]">
+        <Loader2 className="animate-spin" size={22} />
+        Confirming your payment…
+      </div>
+    );
+  }
+  if (status === "error") {
+    return (
+      <div className="max-w-lg mx-auto px-6 py-24 text-center">
+        <p className="text-[#B5573C]">{error}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="max-w-lg mx-auto px-6 py-24 text-center">
+      <div className="w-12 h-12 rounded-full bg-[#4B7A6B] flex items-center justify-center mx-auto mb-6"><Check size={22} className="text-white" /></div>
+      <h2 style={{ fontFamily: "'Fraunces', serif" }} className="text-2xl mb-2">Payment received — you're booked.</h2>
+      {meta && (
+        <p className="text-[#9A9A8C]">{meta.serviceName} on {meta.bookingDate} at {meta.bookingTime}.</p>
+      )}
     </div>
   );
 }
@@ -234,6 +286,29 @@ function BookingFlow({ business, services, hours, onSwitchBusiness }) {
     if (!name.trim() || !email.trim()) return;
     setSubmitting(true); setError("");
     try {
+      if (service.price_cents > 0) {
+        // Paid service: send to Stripe Checkout, booking gets created only after real payment
+        const res = await fetch("/api/create-checkout-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            serviceName: service.name,
+            priceCents: service.price_cents,
+            businessId: business.id,
+            serviceId,
+            bookingDate: toDateKey(dateObj),
+            bookingTime: selectedTime,
+            customerName: name.trim(),
+            customerEmail: email.trim(),
+            returnUrl: window.location.origin + window.location.pathname,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not start payment");
+        window.location.href = data.url;
+        return;
+      }
+      // Free service: book immediately, no payment needed
       await sbRest("bookings", {
         method: "POST",
         prefer: "return=minimal",
@@ -319,7 +394,9 @@ function BookingFlow({ business, services, hours, onSwitchBusiness }) {
               <button onClick={confirmBooking} disabled={!name.trim() || !email.trim() || submitting}
                 className="w-full bg-[#C99A56] text-[#14181F] font-medium rounded-md py-2.5 text-sm mt-2 disabled:opacity-40 flex items-center justify-center gap-2">
                 {submitting ? <Loader2 size={15} className="animate-spin" /> : null}
-                Confirm {formatTime12(selectedTime)} on {dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                {service.price_cents > 0
+                  ? `Pay $${(service.price_cents / 100).toFixed(2)} & book ${formatTime12(selectedTime)}`
+                  : `Confirm ${formatTime12(selectedTime)} on ${dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
               </button>
             </div>
           )}
