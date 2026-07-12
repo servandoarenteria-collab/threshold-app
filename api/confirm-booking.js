@@ -52,6 +52,29 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: err.message || "Failed to save booking" });
     }
 
+    // Look up the business name for the email
+    let businessName = "the business";
+    try {
+      const bizRes = await fetch(`${SUPABASE_URL}/rest/v1/businesses?id=eq.${m.businessId}&select=name`, {
+        headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      });
+      const biz = await bizRes.json();
+      if (biz[0]) businessName = biz[0].name;
+    } catch (e) {}
+
+    fetch(`${req.headers.origin || "https://" + req.headers.host}/api/send-confirmation-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerEmail: m.customerEmail,
+        customerName: m.customerName,
+        businessName,
+        serviceName: m.serviceName,
+        bookingDate: m.bookingDate,
+        bookingTime: m.bookingTime,
+      }),
+    }).catch(() => {});
+
     res.status(200).json({ metadata: m });
   } catch (err) {
     res.status(500).json({ error: err.message });
